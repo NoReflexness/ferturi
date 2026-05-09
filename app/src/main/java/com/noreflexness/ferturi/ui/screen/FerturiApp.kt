@@ -24,6 +24,7 @@ import com.noreflexness.ferturi.ui.components.CalibrationsSection
 import com.noreflexness.ferturi.ui.components.InputsSection
 import com.noreflexness.ferturi.ui.components.ProductsSection
 import com.noreflexness.ferturi.ui.components.ResultSection
+import com.noreflexness.ferturi.ui.components.SystemDiagramBanner
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,6 +71,9 @@ fun FerturiApp(
             ),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            item {
+                SystemDiagramBanner()
+            }
             item {
                 ResultSection(ui = ui)
             }
