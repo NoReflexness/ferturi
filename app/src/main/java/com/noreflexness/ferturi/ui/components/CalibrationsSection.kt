@@ -150,6 +150,9 @@ private fun CalibrationDialog(
     var mixDrawn by remember { mutableStateOf(initial?.let { fmt(it.mixDrawnLiters, 3) } ?: "") }
     var output by remember { mutableStateOf(initial?.let { fmt(it.outputLiters, 3) } ?: "") }
     var time10L by remember { mutableStateOf(initial?.secondsPer10L?.let { fmt(it, 2) } ?: "") }
+    var lpm by remember {
+        mutableStateOf(initial?.secondsPer10L?.takeIf { it > 0 }?.let { fmt(600.0 / it, 2) } ?: "")
+    }
 
     val valid = listOf(valve, mixDrawn, output).all { it.toEuropeanDoubleOrNull()?.let { v -> v > 0 } == true }
 
@@ -189,14 +192,45 @@ private fun CalibrationDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
-                    value = time10L,
-                    onValueChange = { time10L = it },
-                    label = { Text("Seconds to fill 10 L (optional)") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth(),
+                Text(
+                    "Main-line flow rate (optional) — fill either field",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.outline,
                 )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = time10L,
+                        onValueChange = { raw ->
+                            time10L = raw
+                            val s = raw.toEuropeanDoubleOrNull()
+                            lpm = when {
+                                raw.isBlank() -> ""
+                                s != null && s > 0.0 -> fmt(600.0 / s, 2)
+                                else -> lpm
+                            }
+                        },
+                        label = { Text("Seconds for 10 L") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedTextField(
+                        value = lpm,
+                        onValueChange = { raw ->
+                            lpm = raw
+                            val v = raw.toEuropeanDoubleOrNull()
+                            time10L = when {
+                                raw.isBlank() -> ""
+                                v != null && v > 0.0 -> fmt(600.0 / v, 2)
+                                else -> time10L
+                            }
+                        },
+                        label = { Text("L/min") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         },
         confirmButton = {
