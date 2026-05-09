@@ -116,7 +116,8 @@ private fun ProductRow(
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                 )
                 Text(
-                    text = "Recommended ${fmtRatioMlPerL(product.recommendedRatio)}",
+                    text = "Recommended ${fmtRatioMlPerL(product.recommendedRatio)}" +
+                        (product.availableRawLiters?.let { " · ${fmtVolumeL(it)} on hand" } ?: ""),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 if (product.notes.isNotBlank()) {
@@ -147,6 +148,9 @@ private fun ProductDialog(
     var ratioMlPerL by remember {
         mutableStateOf(if (initial != null) fmt(initial.recommendedRatio * 1000.0, 4) else "")
     }
+    var available by remember {
+        mutableStateOf(initial?.availableRawLiters?.let { fmt(it, 3) } ?: "")
+    }
     var notes by remember { mutableStateOf(initial?.notes ?: "") }
 
     AlertDialog(
@@ -170,6 +174,14 @@ private fun ProductDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
+                    value = available,
+                    onValueChange = { available = it },
+                    label = { Text("Raw fertilizer on hand (L, optional)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
                     value = notes,
                     onValueChange = { notes = it },
                     label = { Text("Notes (optional)") },
@@ -182,9 +194,11 @@ private fun ProductDialog(
                 enabled = name.isNotBlank() && ratioMlPerL.toEuropeanDoubleOrNull()?.let { it > 0 } == true,
                 onClick = {
                     val mlPerL = ratioMlPerL.toEuropeanDoubleOrNull() ?: return@TextButton
+                    val onHand = available.toEuropeanDoubleOrNull()?.takeIf { it > 0.0 }
                     val product = (initial ?: Product(name = "", recommendedRatio = 0.0)).copy(
                         name = name.trim(),
                         recommendedRatio = mlPerL / 1000.0,
+                        availableRawLiters = onHand,
                         notes = notes.trim(),
                     )
                     onSave(product)

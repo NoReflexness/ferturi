@@ -26,6 +26,10 @@ data class Calibration(
  * `recommendedRatio` is dimensionless (e.g. 0.005 = 5 mL of raw fertilizer per
  * litre of final output). The UI accepts the input in the most useful unit
  * for the user (mL per L) and converts.
+ *
+ * `availableRawLiters` is how much of the raw concentrate the user has on
+ * hand. When set, recipes that ask for more raw than this trigger a stock
+ * shortage suggestion (smaller batch or different valve).
  */
 @Serializable
 data class Product(
@@ -33,6 +37,7 @@ data class Product(
     val name: String,
     val recommendedRatio: Double,
     val notes: String = "",
+    val availableRawLiters: Double? = null,
 )
 
 @Serializable

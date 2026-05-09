@@ -51,6 +51,7 @@ class FerturiViewModel(app: Application) : AndroidViewModel(app) {
                 containerVolumeL = state.containerVolumeL,
                 preferred = calibration,
                 allCalibrations = state.calibrations,
+                availableRawLiters = product.availableRawLiters,
             )
         }.getOrNull()
     }

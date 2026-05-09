@@ -75,6 +75,78 @@ fun ResultSection(ui: UiState) {
                 tone = Tone.Info,
             )
         }
+        result.stock?.let { shortage ->
+            StockShortageBlock(shortage)
+        }
+    }
+}
+
+@Composable
+private fun StockShortageBlock(shortage: com.noreflexness.ferturi.domain.StockShortage) {
+    val bg = MaterialTheme.colorScheme.tertiaryContainer
+    val fg = MaterialTheme.colorScheme.onTertiaryContainer
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(bg)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon(Icons.Default.Warning, contentDescription = null, tint = fg)
+            Text(
+                text = "Only ${fmtVolumeL(shortage.availableLiters)} on hand · recipe needs ${fmtVolumeL(shortage.neededLiters)}",
+                style = MaterialTheme.typography.titleSmall,
+                color = fg,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        shortage.reducedBatch?.let { reduced ->
+            val total = reduced.rawFertilizerLiters + reduced.waterLiters
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = "Smaller batch (same valve)",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = fg,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    text = "${fmtVolumeL(reduced.rawFertilizerLiters)} raw + ${fmtVolumeL(reduced.waterLiters)} water → ${fmtVolumeL(total)} mix",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = fg,
+                )
+            }
+        }
+        shortage.betterValve?.let { better ->
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = "Or try valve ${fmt(better.calibration.valveSetting, 2)} (full container)",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = fg,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    text = "${fmtVolumeL(better.rawFertilizerLiters)} raw + ${fmtVolumeL(better.waterLiters)} water · container concentration ${fmt(better.containerConcentration * 100.0, 2)} %",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = fg,
+                )
+                better.note?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = fg,
+                    )
+                }
+            }
+        }
+        if (shortage.reducedBatch == null && shortage.betterValve == null) {
+            Text(
+                text = "No achievable adjustment for the available stock at this target.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = fg,
+            )
+        }
     }
 }
 

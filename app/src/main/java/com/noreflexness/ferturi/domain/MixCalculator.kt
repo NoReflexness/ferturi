@@ -53,12 +53,19 @@ object MixCalculator {
      * container volume. Returns a [MixResult] that includes feasibility and
      * an optional [alternative] suggestion when the preferred valve doesn't
      * fit.
+     *
+     * When [availableRawLiters] is provided and the recipe needs more raw
+     * fertilizer than is on hand, a [StockShortage] is attached with the two
+     * possible adjustments: a smaller batch at the same concentration, and
+     * (if calibrations allow) a different valve setting that uses exactly the
+     * available raw at the full container volume.
      */
     fun calculate(
         targetRatio: Double,
         containerVolumeL: Double,
         preferred: Calibration,
         allCalibrations: List<Calibration>,
+        availableRawLiters: Double? = null,
     ): MixResult {
         require(targetRatio > 0.0) { "targetRatio must be > 0" }
         require(containerVolumeL > 0.0) { "containerVolumeL must be > 0" }
@@ -71,10 +78,98 @@ object MixCalculator {
             null
         }
 
+        val basis = if (recipe.feasible) recipe else alternative
+        val stock = if (basis != null && basis.feasible && availableRawLiters != null && availableRawLiters > 0.0
+            && basis.rawFertilizerLiters > availableRawLiters + 1e-9) {
+            StockShortage(
+                availableLiters = availableRawLiters,
+                neededLiters = basis.rawFertilizerLiters,
+                reducedBatch = reducedBatch(basis, availableRawLiters),
+                betterValve = betterValveForStock(
+                    targetRatio = targetRatio,
+                    containerVolumeL = containerVolumeL,
+                    availableRawLiters = availableRawLiters,
+                    cals = allCalibrations,
+                ),
+            )
+        } else {
+            null
+        }
+
         return MixResult(
             preferred = recipe,
             alternative = alternative,
+            stock = stock,
         )
+    }
+
+    /** Same valve and concentration as [basis], but only use [availableRaw] of raw. */
+    private fun reducedBatch(basis: Recipe, availableRaw: Double): Recipe? {
+        val c = basis.containerConcentration
+        if (c <= 0.0 || c > 1.0) return null
+        val totalBatch = availableRaw / c
+        val water = (totalBatch - availableRaw).coerceAtLeast(0.0)
+        return basis.copy(
+            rawFertilizerLiters = availableRaw,
+            waterLiters = water,
+            note = "Smaller batch (${
+                "%.3f".format(totalBatch)
+            } L total) at the same valve and concentration.",
+        )
+    }
+
+    /**
+     * Find a valve setting whose recipe at the full [containerVolumeL] uses
+     * exactly [availableRawLiters] of raw fertilizer. That requires a draw
+     * ratio of `targetRatio / (availableRaw / containerVolume)`. Returns null
+     * unless the calibrations bracket that draw ratio.
+     */
+    private fun betterValveForStock(
+        targetRatio: Double,
+        containerVolumeL: Double,
+        availableRawLiters: Double,
+        cals: List<Calibration>,
+    ): Recipe? {
+        if (cals.isEmpty()) return null
+        val targetC = availableRawLiters / containerVolumeL
+        if (targetC <= 0.0 || targetC > 1.0) return null
+        val targetDrawRatio = targetRatio / targetC
+
+        // Already-existing calibration that matches closely?
+        cals.firstOrNull { abs(drawRatio(it) - targetDrawRatio) < 1e-9 }?.let {
+            return recipeFor(it, targetRatio, containerVolumeL)
+                .copy(note = "Uses exactly the available raw fertilizer.")
+        }
+
+        if (cals.size < 2) return null
+
+        val sorted = cals.sortedBy { it.valveSetting }
+        for (i in 0 until sorted.size - 1) {
+            val a = sorted[i]
+            val b = sorted[i + 1]
+            val ra = drawRatio(a)
+            val rb = drawRatio(b)
+            val (lo, hi) = if (ra <= rb) ra to rb else rb to ra
+            if (targetDrawRatio in lo..hi) {
+                val v = if (abs(rb - ra) < 1e-12) {
+                    (a.valveSetting + b.valveSetting) / 2.0
+                } else {
+                    a.valveSetting + (targetDrawRatio - ra) * (b.valveSetting - a.valveSetting) / (rb - ra)
+                }
+                val interp = Calibration(
+                    id = "interp-stock",
+                    label = "Suggested",
+                    valveSetting = v,
+                    mixDrawnLiters = targetDrawRatio,
+                    outputLiters = 1.0,
+                    secondsPer10L = null,
+                )
+                return recipeFor(interp, targetRatio, containerVolumeL)
+                    .copy(note = "Interpolated between valve %.2f and %.2f to match available raw."
+                        .format(a.valveSetting, b.valveSetting))
+            }
+        }
+        return null
     }
 
     private fun recipeFor(
@@ -191,4 +286,17 @@ data class Recipe(
 data class MixResult(
     val preferred: Recipe,
     val alternative: Recipe? = null,
+    val stock: StockShortage? = null,
+)
+
+/**
+ * Reported when the chosen recipe asks for more raw fertilizer than is on
+ * hand. Contains the two ways out: shrink the batch at the same valve, or
+ * pick a different valve and keep the full container.
+ */
+data class StockShortage(
+    val availableLiters: Double,
+    val neededLiters: Double,
+    val reducedBatch: Recipe?,
+    val betterValve: Recipe?,
 )
